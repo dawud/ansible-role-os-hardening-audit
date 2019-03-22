@@ -1,0 +1,19 @@
+## {{ ansible_managed  }}
+# Do not edit any of these rules directly. The contents of this file are
+# controlled by Ansible variables and each variable is explained in detail
+# within the role documentation.
+
+# Delete all existing auditd rules prior to loading this ruleset.
+-D
+
+# Increase the buffers to survive stress events.
+# Make this bigger for busy systems
+-b 8192
+
+# Not supported option, see:
+# https://bugzilla.redhat.com/show_bug.cgi?id=1437426
+# This determine how long to wait in burst of events
+#--backlog_wait_time 0
+
+# Set the auditd failure flag.
+-f {{ security_rhel7_audit_failure_flag }}

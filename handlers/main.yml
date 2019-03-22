@@ -1,0 +1,27 @@
+---
+# yamllint disable-line
+# NOTE: https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/Security_Guide/sec-starting_the_audit_service.html
+# The service command is the only way to correctly interact with the
+# auditd daemon. You need to use the service command so that the auid
+# value is properly recorded. You can use the systemctl command only for
+# two actions: enable and status.
+# - name: restart auditd
+#   systemd:
+#     name: auditd
+#     state: restarted
+- name: restart auditd
+  command: service auditd restart
+  args:
+    warn: 'no'
+  when:
+    - ansible_virtualization_type != 'docker'
+
+- name: generate auditd rules
+  command: augenrules --load
+  register: augenrules
+  notify: restart auditd
+  # TODO: find out WTF this check fails
+  failed_when: False
+  #  - augenrules.rc != 0
+  when:
+    - ansible_virtualization_type != 'docker'

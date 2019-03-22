@@ -1,0 +1,103 @@
+---
+## auditd configuration
+# This variable is used in tasks/main.yml to configure auditd and audisp
+#
+# Each dictionary has this structure:
+#
+#   command: the command/syscall to audit (required)
+#   stig_id: the number/ID from the STIG (required)
+#   arch_specific: 'yes' if the rule depends on the architecture type,
+#                  otherwise 'no' (required)
+#   path: the path to the command (optional, default is '/usr/bin')
+#   distro: restrict deployment to a single Linux distribution (optional,
+#           should be equal to 'ansible_os_family | lower', such as 'redhat'
+#
+auditd_config:
+  - parameter: disk_full_action
+    value: "{{ security_rhel7_auditd_disk_full_action }}"
+    config: /etc/audisp/audisp-remote.conf
+  - parameter: network_failure_action
+    value: "{{ security_rhel7_auditd_network_failure_action }}"
+    config: /etc/audisp/audisp-remote.conf
+  - parameter: space_left
+    value: "{{ security_rhel7_auditd_space_left }}"
+    config: /etc/audit/auditd.conf
+  - parameter: space_left_action
+    value: "{{ security_rhel7_auditd_space_left_action }}"
+    config: /etc/audit/auditd.conf
+  - parameter: action_mail_acct
+    value: "{{ security_rhel7_auditd_action_mail_acct }}"
+    config: /etc/audit/auditd.conf
+
+## auditd rules
+# This variable is used in tasks/main.yml to deploy auditd rules
+# for various commands and syscalls.
+#
+# Each dictionary has this structure:
+#
+#   command: the command/syscall to audit (required)
+#   path: the path to the command (optional, default is '/usr/bin')
+#   auid: value for audit
+#   distro: restrict deployment to a single Linux distribution (optional,
+#           should be equal to 'ansible_os_family | lower', such as 'redhat'
+#
+audited_commands:
+  - command: at
+    auid: 'unset'
+  - command: chage
+  - command: chcon
+  - command: chsh
+  - command: crontab
+  - command: delete_module
+  - command: init_module
+  - command: gpasswd
+  - command: mount
+    auid: 'unset'
+  - command: newgidmap
+    auid: 'unset'
+  - command: newuidmap
+    auid: 'unset'
+  - command: newgrp
+  - command: pam_timestamp_check
+    path: /usr/sbin
+  - command: passwd
+  - command: postdrop
+    path: /usr/sbin
+  - command: postqueue
+    path: /usr/sbin
+  - command: pt_chown
+    path: /usr/libexec
+    distro: redhat
+  - command: restorecon
+    path: /usr/sbin
+  - command: rmdir
+  - command: semanage
+    path: /usr/sbin
+  - command: setsebool
+    path: /usr/sbin
+  - command: seunshare
+    path: /usr/sbin
+    auid: 'unset'
+  - command: ssh-keysign
+    path: /usr/libexec/openssh
+  - command: su
+  - command: sudo
+  - command: sudoedit
+  - command: umount
+  - command: unix_chkpwd
+    path: /usr/sbin
+  - command: userhelper
+    path: /usr/sbin
+  - command: usernetctl
+    path: /usr/sbin
+    auid: 'unset'
+
+# RHEL 7 STIG: Packages to add/remove
+stig_packages_rhel7:
+  - packages:
+      - audispd-plugins
+      - audit
+      - audit-libs
+      - audit-libs-python
+    state: "{{ security_package_state }}"
+    enabled: 'True'

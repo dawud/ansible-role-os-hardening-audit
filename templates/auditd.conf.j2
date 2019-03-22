@@ -1,0 +1,80 @@
+# {{ ansible_managed }}
+#
+# This file controls the configuration of the audit daemon
+#
+
+local_events = yes
+write_logs = yes
+## log_file
+# The directory that holds the Audit log files (usually /var/log/audit/) should
+# reside on a separate mount point. This prevents other processes from consuming
+# space in this directory, and provides accurate detection of the remaining space
+# for the Audit daemon.
+log_file = /var/log/audit/audit.log
+log_group = root
+log_format = RAW
+## flush
+# Should be set to incremental_async. It works in combination with the freq
+# parameter, which determines how many records can be sent to the disk before
+# forcing a hard synchronization with the hard drive. The freq parameter should
+# be set to 100. These parameters assure that Audit event data is synchronized
+# with the log files on the disk while keeping good performance for bursts of
+# activity.
+flush = INCREMENTAL_ASYNC
+freq = 100
+## max_log_file
+# Specifies the maximum size of a single Audit log file, must be set to make full
+# use of the available space on the partition that holds the Audit log files.
+max_log_file = 8
+num_logs = 5
+priority_boost = 4
+disp_qos = lossy
+dispatcher = /sbin/audispd
+name_format = NONE
+#name = mydomain
+## max_log_file_action
+# Decides what action is taken once the limit set in max_log_file is reached,
+# should be set to keep_logs to prevent Audit log files from being overwritten.
+max_log_file_action = KEEP_LOGS
+## space_left
+# Specifies the amount of free space left on the disk for which an action that is
+# set in the space_left_action parameter is triggered. Must be set to a number that
+# gives the administrator enough time to respond and free up disk space. The
+# space_left value depends on the rate at which the Audit log files are generated.
+space_left = {{ security_rhel7_auditd_space_left }}
+## space_left_action
+# It is recommended to set the space_left_action parameter to email or exec with
+# an appropriate notification method.
+space_left_action = {{ security_rhel7_auditd_space_left_action }}
+action_mail_acct = {{ security_rhel7_auditd_action_mail_acct }}
+## admin_space_left
+# Specifies the absolute minimum amount of free space for which an action that is
+# set in the admin_space_left_action parameter is triggered, must be set to a value
+# that leaves enough space to log actions performed by the administrator.
+admin_space_left = 50
+## admin_space_left_action
+# Should be set to single to put the system into single-user mode and allow the
+# administrator to free up some disk space.
+admin_space_left_action = SUSPEND
+## disk_full_action
+# Specifies an action that is triggered when no free space is available on the
+# partition that holds the Audit log files, must be set to halt or single. This
+# ensures that the system is either shut down or operating in single-user mode
+# when Audit can no longer log events.
+disk_full_action = SUSPEND
+## disk_error_action
+# Specifies an action that is triggered in case an error is detected on the
+# partition that holds the Audit log files, must be set to syslog, single, or halt,
+# depending on your local security policies regarding the handling of hardware
+# malfunctions.
+disk_error_action = SUSPEND
+use_libwrap = yes
+#tcp_listen_port =
+tcp_listen_queue = 5
+tcp_max_per_addr = 1
+#tcp_client_ports = 1024-65535
+tcp_client_max_idle = 0
+enable_krb5 = no
+krb5_principal = auditd
+#krb5_key_file = /etc/audit/audit.key
+distribute_network = no

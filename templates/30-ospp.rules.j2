@@ -1,0 +1,128 @@
+## {{ ansible_managed  }}
+# Do not edit any of these rules directly. The contents of this file are
+# controlled by Ansible variables and each variable is explained in detail
+# within the role documentation.
+
+{# Things that could affect time #}
+#-a always,exit -F arch=b32 -S adjtimex,settimeofday,stime -F key=time-change
+-a always,exit -F arch=b64 -S adjtimex,settimeofday -F key=time-change
+#-a always,exit -F arch=b32 -S clock_settime -F a0=0x0 -F key=time-change
+-a always,exit -F arch=b64 -S clock_settime -F a0=0x0 -F key=time-change
+{# Introduced in 2.6.39, commented out because it can make false positives #}
+#-a always,exit -F arch=b32 -S clock_adjtime -F key=time-change
+#-a always,exit -F arch=b64 -S clock_adjtime -F key=time-change
+-w /etc/localtime -p wa -k time-change
+
+{% if security_rhel7_audit_account_actions | bool %}
+{# V-72197 - The operating system must generate audit records for all   #}
+{# account creations, modifications, disabling, and termination events. #}
+-w /etc/passwd -p wa -k audit_rules_usergroup_modification
+#-a always,exit -F arch=b32 -S open,openat,open_by_handle_at -F a2&03 -F path=/etc/passwd -F auid>=1000 -F auid!=unset -F key=user-modify
+-a always,exit -F arch=b64 -S open,openat,open_by_handle_at -F a2&03 -F path=/etc/passwd -F auid>=1000 -F auid!=unset -F key=user-modify
+-w /etc/group -p wa -k audit_rules_usergroup_modification
+#-a always,exit -F arch=b32 -S open,openat,open_by_handle_at -F a2&03 -F path=/etc/group -F auid>=1000 -F auid!=unset -F key=group-modify
+-a always,exit -F arch=b64 -S open,openat,open_by_handle_at -F a2&03 -F path=/etc/group -F auid>=1000 -F auid!=unset -F key=group-modify
+-w /etc/gshadow -p wa -k audit_rules_usergroup_modification
+-w /etc/shadow -p wa -k audit_rules_usergroup_modification
+-w /etc/security/opasswd -p wa -k audit_rules_usergroup_modification
+{% endif %}
+
+{# Things that could affect system locale #}
+#-a always,exit -F arch=b32 -S sethostname,setdomainname -F key=system-locale
+-a always,exit -F arch=b64 -S sethostname,setdomainname -F key=system-locale
+-w /etc/issue -p wa -k system-locale
+-w /etc/issue.net -p wa -k system-locale
+-w /etc/hosts -p wa -k system-locale
+-w /etc/hostname -p wa -k system-locale
+-a always,exit -F dir=/etc/NetworkManager/ -F perm=wa -F key=system-locale
+
+{# Things that could affect MAC policy #}
+-a always,exit -F dir=/etc/selinux/ -F perm=wa -F key=MAC-policy
+
+{% if security_rhel7_audit_account_access | bool %}
+{# V-72143 - The operating system must generate audit records for all #}
+{# successful/unsuccessful account access count events. #}
+-w /var/log/tallylog -p wa -k V-72143
+{# V-72145 - The operating system must generate audit records for all #}
+{# unsuccessful account access events. #}
+-w /var/run/faillock -p wa -k V-72145
+{# V-72147 - The operating system must generate audit records for all #}
+{# successful account access events. #}
+-w /var/log/lastlog -p wa -k V-72147
+{% endif %}
+
+{# Process and session initiation (unsuccessful and successful) #}
+-w /var/run/utmp -p wa -k session
+-w /var/log/btmp -p wa -k session
+-w /var/log/wtmp -p wa -k session
+
+{# Rules for grouped syscalls                                                #}
+{# Grouping system calls related to the same event is more efficient         #}
+{% if security_rhel7_audit_file_deletion_events_by_user | bool %}
+#-a always,exit -F arch=b32 -S rename,renameat,rmdir,unlink,unlinkat -F auid>=1000 -F auid!=4294967295 -F key=delete
+-a always,exit -F arch=b64 -S rename,renameat,rmdir,unlink,unlinkat -F auid>=1000 -F auid!=4294967295 -F key=delete
+{% endif %}
+{% if security_rhel7_audit_unauthorized_creation_attempts_to_files | bool %}
+#-a always,exit -F arch=b32 -S open,openat,open_by_handle_at -F a2&0100 -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-create
+#-a always,exit -F arch=b32 -S open,openat,open_by_handle_at -F a2&0100 -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=unsuccesful-create
+-a always,exit -F arch=b64 -S open,openat,open_by_handle_at -F a2&0100 -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-create
+-a always,exit -F arch=b64 -S open,openat,open_by_handle_at -F a2&0100 -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=unsuccesful-create
+{% endif %}
+{% if security_rhel7_audit_unauthorized_modification_attempts_to_files | bool %}
+#-a always,exit -F arch=b32 -S open,openat,open_by_handle_at -F a2&01003 -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-modification
+#-a always,exit -F arch=b32 -S open,openat,open_by_handle_at -F a2&01003 -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=unsuccesful-modification
+-a always,exit -F arch=b64 -S open,openat,open_by_handle_at -F a2&01003 -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-modification
+-a always,exit -F arch=b64 -S open,openat,open_by_handle_at -F a2&01003 -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=unsuccesful-modification
+{% endif %}
+{% if security_rhel7_audit_unsuccessul_delete_attempts_to_files | bool %}
+#-a always,exit -F arch=b32 -S unlink,unlinkat,rename,renameat -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-delete
+#-a always,exit -F arch=b32 -S unlink,unlinkat,rename,renameat -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=unsuccesful-delete
+-a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-delete
+-a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=unsuccesful-delete
+{% endif %}
+{% if security_rhel7_audit_unsuccessul_permission_changes_to_files | bool %}
+#-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat,setxattr,lsetxattr,fsetxattr,lremovexattr,fremovexattr,removexattr -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-perm-change
+#-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat,setxattr,lsetxattr,fsetxattr,lremovexattr,fremovexattr,removexattr -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=unsuccesful-perm-change
+-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat,setxattr,lsetxattr,fsetxattr,lremovexattr,fremovexattr,removexattr -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-perm-change
+-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat,setxattr,lsetxattr,fsetxattr,lremovexattr,fremovexattr,removexattr -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=unsuccesful-perm-change
+{% endif %}
+{% if security_rhel7_audit_unsuccessul_ownership_changes_to_files | bool %}
+#-a always,exit -F arch=b32 -S lchown,fchown,chown,fchownat -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-perm-change
+#-a always,exit -F arch=b32 -S lchown,fchown,chown,fchownat -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-perm-change
+-a always,exit -F arch=b64 -S lchown,fchown,chown,fchownat -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-perm-change
+-a always,exit -F arch=b64 -S lchown,fchown,chown,fchownat -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=unsuccesful-perm-change
+{% endif %}
+{% if security_rhel7_audit_unauthorized_access_attempts_to_files | bool %}
+#-a always,exit -F arch=b32 -S creat,open,open_by_handle_at,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -F key=access
+#-a always,exit -F arch=b32 -S creat,open,open_by_handle_at,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -F key=access
+-a always,exit -F arch=b64 -S creat,open,open_by_handle_at,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -F key=access
+-a always,exit -F arch=b64 -S creat,open,open_by_handle_at,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -F key=access
+{% endif %}
+
+{# The following loop takes a variable called audited_commands (a list of    #}
+{# dictionaries) and creates audit rules for each audited command            #}
+{% for audited_command in audited_commands %}
+{# We replace any dashes in the command with underscores. The variables that #}
+{# control the deployment of each rule can only contain underscores.         #}
+{% set command_sanitized = audited_command['command'] | replace('-', '_') %}
+{# Verify that the variable controlling the rule is enabled and any distro-  #}
+{# specific requirements are met.                                            #}
+{%   if security_rhel7_audit_privileged_commands | bool %}
+{%     if vars['security_rhel7_audit_' + command_sanitized ] | bool and (audited_command['distro'] | default(ansible_os_family | lower) == ansible_os_family | lower) %}
+# {{ audited_command }} - All uses of the {{ audited_command['command'] }} command must be audited.
+-a always,exit -F path={{ audited_command['path'] | default('/usr/bin') }}/{{ audited_command['command'] }} -F perm=x -F auid>=1000 -F auid!={{ audited_command['auid'] | default('4294967295') }} -k key=privileged
+{%     endif %}
+{%   endif %}
+{% endfor %}
+
+{% if security_rhel7_audit_sudo_config_changes | bool %}
+{# V-72163 - The operating system must generate audit records containing #}
+{# the full-text recording of modifications to sudo configuration files. #}
+-w /etc/sudoers -p wa -k V-72163
+-w /etc/sudoers.d/ -p wa -k V-72163
+{% endif %}
+
+{# Record Access Events to Audit Log directory FAU_GEN.1.1.c #}
+{% if security_rhel7_audit_log_access_modifications | bool %}
+-a always,exit -F dir=/var/log/audit/ -F perm=rwa -F auid>=1000 -F auid!=unset -F key=access-audit-trail
+{% endif %}

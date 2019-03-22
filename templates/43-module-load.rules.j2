@@ -1,0 +1,24 @@
+## {{ ansible_managed  }}
+# Do not edit any of these rules directly. The contents of this file are
+# controlled by Ansible variables and each variable is explained in detail
+# within the role documentation.
+
+{% if security_rhel7_audit_insmod | bool %}
+# These rules watch for kernel module insertion
+{# CCE-80446-8 - All uses of the insmod command must be audited. #}
+-w /usr/sbin/insmod -p x -k modules
+#-a always,exit -F arch=b32 -S init_module,finit_module -F key=modules
+-a always,exit -F arch=b64 -S init_module,finit_module -F key=modules
+{% endif %}
+
+{% if security_rhel7_audit_rmmod | bool %}
+{# CCE-80416-1 CCE-80415-3 - All uses of the rmmod command must be audited. #}
+-w /usr/sbin/rmmod -p x -k modules
+#-a always,exit -F arch=b32 -S delete_module -k modules
+-a always,exit -F arch=b64 -S delete_module -k modules
+{% endif %}
+
+{% if security_rhel7_audit_modprobe | bool %}
+{# CCE-80417-9 - All uses of the modprobe command must be audited. #}
+-w /usr/sbin/modprobe -p x -k modules
+{% endif %}

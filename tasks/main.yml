@@ -1,0 +1,276 @@
+---
+- name: Add or remove auditd packages based on STIG requirements
+  yum:
+    # yamllint disable-line
+    name: "{{ stig_packages_rhel7 | selectattr('enabled') | selectattr('state', 'equalto', item) | sum(attribute='packages', start=[]) }}"
+    state: "{{ item }}"
+  with_items:
+    # yamllint disable-line
+    - "{{ stig_packages_rhel7 | selectattr('enabled') | map(attribute='state') | unique | list }}"
+  tags:
+    - cat1
+    - auth
+    - packages
+    - services
+    - V-71897
+    - V-71967
+    - V-71969
+    - V-72067
+    - V-72077
+    - V-72213
+    - V-72233
+    - V-72301
+    - V-72307
+
+- name: Verify that auditd.conf exists
+  stat:
+    path: /etc/audit/auditd.conf
+  register: auditd_conf
+  check_mode: 'no'
+  tags:
+    - always
+
+- name: Verify that audisp-remote.conf exists
+  stat:
+    path: /etc/audisp/audisp-remote.conf
+  register: audisp_remote_conf
+  check_mode: 'no'
+  tags:
+    - always
+
+- name: Get valid system architectures for audit rules
+  set_fact:
+    # yamllint disable-line
+    auditd_architectures: "{{ (ansible_architecture == 'ppc64le') | ternary(['ppc64'], ['b32', 'b64']) }}"
+  check_mode: 'no'
+  tags:
+    - always
+
+- name: Remove system default audit.rules file
+  file:
+    path: /etc/audit/rules.d/audit.rules
+    state: absent
+  when:
+    - auditd_conf.stat.exists
+  notify:
+    - generate auditd rules
+  tags:
+    - always
+
+# TODO: generate the 31-privileged.rules from the script in files/
+- name: Deploy rules for auditd based on STIG requirements
+  template:
+    src: "{{ item }}.j2"
+    dest: "/etc/audit/rules.d/{{ item }}"
+    owner: root
+    group: root
+    mode: 0640
+    seuser: system_u
+    serole: object_r
+    setype: auditd_etc_t
+    selevel: s0
+    backup: 'yes'
+  when:
+    - auditd_conf.stat.exists
+  with_items:
+    - 10-base-config.rules
+    - 20-dont-audit.rules
+    - 21-no32bit.rules
+    #- 30-pci-dss-v31.rules
+    - 30-ospp.rules
+    - 41-containers.rules
+    - 42-injection.rules
+    - 43-module-load.rules
+    - 99-finalize.rules
+  notify:
+    - generate auditd rules
+  tags:
+    - auditd
+    - V-72167
+    - V-72155
+    - V-72139
+    - V-72105
+    - V-72097
+    - V-72123
+    - V-72183
+    - V-72189
+    - V-72107
+    - V-72109
+    - V-72099
+    - V-72103
+    - V-72119
+    - V-72113
+    - V-72133
+    - V-72187
+    - V-72153
+    - V-72101
+    - V-72121
+    - V-72115
+    - V-72171
+    - V-72165
+    - V-72125
+    - V-72127
+    - V-72129
+    - V-72185
+    - V-72149
+    - V-72175
+    - V-72177
+    - V-72181
+    - V-72117
+    - V-72199
+    - V-72201
+    - V-72141
+    - V-72203
+    - V-72135
+    - V-72137
+    - V-72111
+    - V-72179
+    - V-72159
+    - V-72161
+    - V-72169
+    - V-72131
+    - V-72173
+    - V-72151
+    - V-72205
+    - V-72207
+    - V-72157
+    - V-72143
+    - V-72163
+    - V-72191
+    - V-72193
+    - V-72195
+    - V-72197
+    - V-72081
+
+- name: Flush handlers
+  meta: flush_handlers
+
+- name: Manage auditd configuration
+  template:
+    src: auditd.conf.j2
+    dest: /etc/audit/auditd.conf
+    owner: root
+    group: root
+    mode: 0640
+    seuser: system_u
+    serole: object_r
+    setype: auditd_etc_t
+    selevel: s0
+    backup: 'yes'
+  when:
+    - auditd_conf.stat.exists
+  notify:
+    - restart auditd
+
+- name: Manage audispd configuration
+  template:
+    src: audispd.conf.j2
+    dest: /etc/audisp/audisp.conf
+    owner: root
+    group: root
+    mode: 0640
+    seuser: system_u
+    serole: object_r
+    setype: etc_t
+    selevel: s0
+    backup: 'yes'
+  notify:
+    - restart auditd
+
+- name: Manage audispd plugins configuration
+  template:
+    src: "{{ item }}.conf.j2"
+    dest: "/etc/audisp/plugins.d/{{ item }}.conf"
+    owner: root
+    group: root
+    mode: 0640
+    seuser: system_u
+    serole: object_r
+    setype: etc_t
+    selevel: s0
+    backup: 'yes'
+  with_items:
+    - af_unix
+    - sedispatch
+    - syslog
+  notify:
+    - restart auditd
+
+# yamllint disable-line
+- name: V-72083 - The operating system must off-load audit records onto a different system or media from the system being audited
+  lineinfile:
+    dest: /etc/audisp/audisp-remote.conf
+    regexp: "^(#)?remote_server"
+    line: "remote_server = {{ security_audisp_remote_server }}"
+  when:
+    - security_audisp_remote_server is defined
+    - auditd_conf.stat.exists
+  notify:
+    - restart auditd
+  tags:
+    - medium
+    - auditd
+    - V-72083
+
+# yamllint disable-line
+- name: V-72085 - The operating system must encrypt the transfer of audit records off-loaded onto a different system or media from the system being audited
+  lineinfile:
+    dest: /etc/audisp/audisp-remote.conf
+    regexp: "^(#)?enable_krb5"
+    line: "enable_krb5 = yes"
+  when:
+    - security_audisp_enable_krb5 is defined
+    - auditd_conf.stat.exists
+  notify:
+    - restart auditd
+  tags:
+    - medium
+    - auditd
+    - V-72085
+
+- name: Validate auditd/audispd configurations
+  lineinfile:
+    dest: "{{ item.config }}"
+    regexp: '^#?{{ item.parameter }}\s*='
+    line: "{{ item.parameter }} = {{ item.value }}"
+  with_items: "{{ auditd_config }}"
+  when:
+    - auditd_conf.stat.exists
+    - audisp_remote_conf.stat.exists
+  notify:
+    - restart auditd
+  tags:
+    - high
+    - auditd
+    - V-72087
+    - V-72089
+    - V-72091
+    - V-72093
+
+- name: Ensure auditd is running and enabled at boot time
+  systemd:
+    name: auditd
+    state: started
+    enabled: 'yes'
+  when:
+    - ansible_virtualization_type != 'docker'
+    - auditd_conf.stat.exists
+  tags:
+    - high
+    - auditd
+    - V-72079
+
+- name: Manage auditd log rotation cron job
+  template:
+    src: auditd.cron.j2
+    dest: /etc/cron.daily/auditd
+    owner: root
+    group: root
+    mode: 0750
+    seuser: system_u
+    serole: object_r
+    setype: bin_t
+    selevel: s0
+    backup: 'no'
+  when:
+    - ansible_virtualization_type != 'docker'

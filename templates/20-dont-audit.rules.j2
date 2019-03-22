@@ -1,0 +1,23 @@
+## {{ ansible_managed  }}
+# Do not edit any of these rules directly. The contents of this file are
+# controlled by Ansible variables and each variable is explained in detail
+# within the role documentation.
+
+## This is for don't audit rules. We put these early because audit
+## is a first match wins system. Uncomment the rules you want.
+
+{% if security_rhel7_audit_dont_audit_cron | bool %}
+# Cron jobs fill the logs with stuff we normally don't want
+-a never,user -F subj_type=crond_t
+{% endif %}
+
+{% if security_rhel7_audit_dont_audit_chrony | bool %}
+# This prevents chrony from overwhelming the logs
+-a never,exit -F arch=x86_64 -S adjtimex -F auid=unset -F uid=chrony -F subj_type=chronyd_t
+{% endif %}
+
+{% if security_rhel7_audit_dont_audit_crypto_key_user | bool %}
+# This is not very interesting and wastes a lot of space if
+# the server is public facing
+-a always,exclude -F msgtype=CRYPTO_KEY_USER
+{% endif %}
